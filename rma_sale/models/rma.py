@@ -78,6 +78,22 @@ class Rma(models.Model):
     def _onchange_order_id(self):
         self.product_id = self.picking_id = False
 
+    def action_refund(self):
+        super(Rma, self).action_refund()
+        group_dict = {}
+        for record in self.filtered("refund_line_id"):
+            key = (record.partner_invoice_id.id, record.company_id.id)
+            group_dict.setdefault(key, self.env["rma"])
+            group_dict[key] |= record
+        for rmas in group_dict.values():
+            for rma in rmas:
+                if rma.sale_line_id and rma.refund_line_id:
+                    rma.refund_line_id.write(
+                        {
+                            "sale_line_ids": [(6, 0, rma.sale_line_id.ids)]
+                        }
+                    )
+
     def _prepare_refund(self, invoice_form, origin):
         """Inject salesman from sales order (if any)"""
         res = super()._prepare_refund(invoice_form, origin)
@@ -105,3 +121,4 @@ class Rma(models.Model):
         if line:
             line_form.discount = line.discount
             line_form.sequence = line.sequence
+
